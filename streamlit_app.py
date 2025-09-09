@@ -7,6 +7,9 @@ import streamlit as st
 import os
 import json
 from dotenv import load_dotenv
+# Add this at the top of your streamlit_app.py after the imports
+import time
+from datetime import datetime
 
 # Import your existing functions
 from main import summarize_report
@@ -108,8 +111,12 @@ if not check_api_params():
         submitted = st.form_submit_button("Process Report", type="primary")
 
     if submitted and report_url:
+        start_time = time.time()
         with st.spinner("Processing report... This may take a few moments."):
             try:
+                # Add a timeout mechanism
+                st.info(f"�� Started processing at {datetime.now().strftime('%H:%M:%S')}")
+                
                 summary = summarize_report(
                     report_url=report_url,
                     cascaid_id=cascaid_id,
@@ -118,12 +125,18 @@ if not check_api_params():
                     report_date=report_date
                 )
                 
-                st.success("✅ Report processed successfully!")
+                end_time = time.time()
+                processing_time = end_time - start_time
+                
+                st.success(f"✅ Report processed successfully in {processing_time:.1f} seconds!")
                 st.markdown("### 📋 AI Summary")
                 st.markdown(summary)
                 
             except Exception as e:
-                st.error(f"❌ Error processing report: {str(e)}")
+                end_time = time.time()
+                processing_time = end_time - start_time
+                st.error(f"❌ Error processing report after {processing_time:.1f} seconds: {str(e)}")
+                st.error("This might be due to authentication issues or a very large file.")
 
     elif submitted and not report_url:
         st.warning("⚠️ Please enter a Google Drive URL")
