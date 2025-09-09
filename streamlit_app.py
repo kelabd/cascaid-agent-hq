@@ -7,9 +7,9 @@ import streamlit as st
 import os
 import json
 from dotenv import load_dotenv
-# Add this at the top of your streamlit_app.py after the imports
 import time
 from datetime import datetime
+import logging
 
 # Import your existing functions
 from main import summarize_report
@@ -17,10 +17,14 @@ from main import summarize_report
 # Load environment variables
 load_dotenv()
 
+# Add detailed logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Page config
 st.set_page_config(
     page_title="Cascaid Agent HQ",
-    page_icon="��",
+    page_icon="",
     layout="wide"
 )
 
@@ -114,8 +118,36 @@ if not check_api_params():
         start_time = time.time()
         with st.spinner("Processing report... This may take a few moments."):
             try:
-                # Add a timeout mechanism
-                st.info(f"�� Started processing at {datetime.now().strftime('%H:%M:%S')}")
+                # Add step-by-step tracking
+                st.info(f" Started processing at {datetime.now().strftime('%H:%M:%S')}")
+                
+                # Step 1: Extract file ID
+                st.info(" Step 1: Extracting file ID from URL...")
+                step1_start = time.time()
+                
+                from drive_fetch import file_id_from_url
+                file_id = file_id_from_url(report_url)
+                st.success(f"✅ File ID extracted: {file_id} (took {time.time() - step1_start:.1f}s)")
+                
+                # Step 2: Download PDF
+                st.info("📥 Step 2: Downloading PDF from Google Drive...")
+                step2_start = time.time()
+                
+                from drive_fetch import fetch_pdf_bytes
+                pdf_bytes = fetch_pdf_bytes(file_id)
+                st.success(f"✅ PDF downloaded: {len(pdf_bytes)} bytes (took {time.time() - step2_start:.1f}s)")
+                
+                # Step 3: Extract text
+                st.info(" Step 3: Extracting text from PDF...")
+                step3_start = time.time()
+                
+                from text_extract import pdf_bytes_to_text
+                text = pdf_bytes_to_text(pdf_bytes)
+                st.success(f"✅ Text extracted: {len(text)} characters (took {time.time() - step3_start:.1f}s)")
+                
+                # Step 4: Generate AI summary
+                st.info(" Step 4: Generating AI summary...")
+                step4_start = time.time()
                 
                 summary = summarize_report(
                     report_url=report_url,
@@ -137,6 +169,16 @@ if not check_api_params():
                 processing_time = end_time - start_time
                 st.error(f"❌ Error processing report after {processing_time:.1f} seconds: {str(e)}")
                 st.error("This might be due to authentication issues or a very large file.")
+                
+                # Show which step failed
+                if 'file_id_from_url' in str(e):
+                    st.error("Failed at Step 1: URL parsing")
+                elif 'fetch_pdf_bytes' in str(e):
+                    st.error("Failed at Step 2: Google Drive download")
+                elif 'pdf_bytes_to_text' in str(e):
+                    st.error("Failed at Step 3: PDF text extraction")
+                else:
+                    st.error("Failed at Step 4: AI processing")
 
     elif submitted and not report_url:
         st.warning("⚠️ Please enter a Google Drive URL")
